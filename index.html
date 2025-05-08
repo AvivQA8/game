@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>משחק זיכרון חשבוני</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f0f8ff;
+            text-align: center;
+            margin: 0;
+            padding: 20px;
+            direction: rtl;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+        }
+        .welcome-screen {
+            margin: 20px 0;
+        }
+        .game-screen {
+            display: none;
+        }
+        .stats {
+            display: flex;
+            justify-content: space-around;
+            margin: 20px 0;
+            font-size: 18px;
+        }
+        .game-board {
+            display: grid;
+            gap: 10px;
+            margin: 20px auto;
+            max-width: 700px;
+        }
+        .card {
+            width: 80px;
+            height: 80px;
+            background-color: #3498db;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: transform 0.3s, background-color 0.3s;
+            perspective: 1000px;
+        }
+        .card-inner {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            text-align: center;
+            transition: transform 0.6s;
+            transform-style: preserve-3d;
+        }
+        .card.flipped .card-inner {
+            transform: rotateY(180deg);
+        }
+        .card-front, .card-back {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            backface-visibility: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 8px;
+        }
+        .card-front {
+            background-color: #3498db;
+            color: white;
+            transform: rotateY(180deg);
+        }
+        .card-back {
+            background-color: #2c3e50;
+            transform: rotateY(0deg);
+        }
+        .card:hover {
+            transform: scale(1.05);
+        }
+        .card.error {
+            animation: shake 0.5s;
+        }
+        .card.matched {
+            visibility: hidden;
+        }
+        
+        @keyframes shake {
+            0% { transform: translateX(0); }
+            20% { transform: translateX(-10px); }
+            40% { transform: translateX(10px); }
+            60% { transform: translateX(-10px); }
+            80% { transform: translateX(10px); }
+            100% { transform: translateX(0); }
+        }
+        
+        .message {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(231, 76, 60, 0.9);
+            color: white;
+            padding: 15px 30px;
+            border-radius: 5px;
+            font-size: 20px;
+            z-index: 100;
+            display: none;
+        }
+        .instructions {
+            font-size: 20px;
+            margin: 20px 0;
+            color: #2980b9;
+            font-weight: bold;
+        }
+        button {
+            background-color: #2ecc71;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            font-size: 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 10px;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #27ae60;
+        }
+        input {
+            padding: 10px;
+            font-size: 16px;
+            border-radius: 5px;
+            border: 1px solid #bdc3c7;
+            width: 200px;
+            text-align: center;
+            margin: 10px;
+        }
+        .result-screen {
+            display: none;
+            font-size: 24px;
+            margin: 20px 0;
+        }
+        .score {
+            font-size: 30px;
+            font-weight: bold;
+            color: #e74c3c;
+            margin: 10px 0;
+        }
+        @media (max-width: 600px) {
+            .game-board {
+                grid-template-columns: repeat(3, 1fr) !important;
+            }
+            .card {
+                width: 60px;
+                height: 60px;
+                font-size: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>משחק זיכרון חשבוני</h1>
+        
+        <!-- מסך פתיחה -->
+        <div class="welcome-screen" id="welcomeScreen">
+            <p>ברוכים הבאים למשחק זיכרון חשבוני!</p>
+            <p>עליך למצוא זוגות של מספרים שסכומם שווה למספר היעד.</p>
+            <input type="text" id="playerName" placeholder="הכנס את שמך" />
+            <button id="startButton">התחל משחק</button>
+        </div>
+        
+        <!-- מסך המשחק -->
+        <div class="game-screen" id="gameScreen">
+            <div class="instructions" id="instructions"></div>
+            <div class="stats">
+                <div id="timer">זמן: 00:00</div>
+                <div id="score">נקודות: 0</div>
+                <div id="level">שלב: 1</div>
+            </div>
+            <div class="game-board" id="gameBoard"></div>
+            <button id="nextLevelButton" style="display: none;">עבור לשלב הבא</button>
+        </div>
+        
+        <!-- מסך סיום -->
+        <div class="result-screen" id="resultScreen">
+            <p id="playerNameResult"></p>
+            <p>סיימת את כל השלבים!</p>
+            <div class="score" id="finalScore"></div>
+            <p>כל הכבוד!</p>
+            <button id="playAgainButton">שחק שוב</button>
+        </div>
+        
+        <!-- הודעת שגיאה -->
+        <div class="message" id="errorMessage">התרגיל לא נכון!</div>
+    </div>
+
+    <script>
+        // משתנים גלובליים
+        let playerName = "";
+        let currentLevel = 1;
+        let score = 0;
+        let timer = 0;
+        let timerInterval;
+        let cards = [];
+        let selectedCards = [];
+        let targetSum = 10;
+        let cardsPerLevel = [12, 16, 20];
+        let targetSumPerLevel = [10, 30, 100];
+        let maxNumbersPerLevel = [10, 30, 100];
+        let pairsFound = 0;
+        
+        // אלמנטים מהדום
+        const welcomeScreen = document.getElementById("welcomeScreen");
+        const gameScreen = document.getElementById("gameScreen");
+        const resultScreen = document.getElementById("resultScreen");
+        const gameBoard = document.getElementById("gameBoard");
+        const instructions = document.getElementById("instructions");
+        const timerElement = document.getElementById("timer");
+        const scoreElement = document.getElementById("score");
+        const levelElement = document.getElementById("level");
+        const nextLevelButton = document.getElementById("nextLevelButton");
+        const finalScoreElement = document.getElementById("finalScore");
+        const playerNameResult = document.getElementById("playerNameResult");
+        
+        // כפתורים
+        document.getElementById("startButton").addEventListener("click", startGame);
+        document.getElementById("nextLevelButton").addEventListener("click", goToNextLevel);
+        document.getElementById("playAgainButton").addEventListener("click", resetGame);
+        
+        // פונקציה להתחלת המשחק
+        function startGame() {
+            playerName = document.getElementById("playerName").value.trim();
+            if (!playerName) {
+                alert("אנא הכנס את שמך כדי להתחיל");
+                return;
+            }
+            
+            welcomeScreen.style.display = "none";
+            gameScreen.style.display = "block";
+            
+            startLevel(currentLevel);
+            startTimer();
+        }
+        
+        // פונקציה להתחלת שלב
+        function startLevel(level) {
+            // איפוס משתנים לשלב
+            pairsFound = 0;
+            selectedCards = [];
+            gameBoard.innerHTML = "";
+            targetSum = targetSumPerLevel[level - 1];
+            
+            // הגדרת הוראות השלב
+            instructions.textContent = `שלב ${level}: מצא זוגות של מספרים שסכומם ${targetSum}`;
+            levelElement.textContent = `שלב: ${level}`;
+            
+            // הגדרת סגנון הלוח לפי מספר הכרטיסים
+            const numCards = cardsPerLevel[level - 1];
+            const columns = level === 1 ? 4 : level === 2 ? 4 : 5;
+            gameBoard.style.gridTemplateColumns = `repeat(${columns}, 1fr)`;
+            
+            // יצירת כרטיסים
+            createCards(numCards, level);
+            
+            // הצגת הכרטיסים בסדר אקראי
+            shuffleCards();
+            renderCards();
+            
+            // הסתרת כפתור המעבר לשלב הבא
+            nextLevelButton.style.display = "none";
+        }
+        
+        // פונקציה ליצירת כרטיסים
+        function createCards(numCards, level) {
+            cards = [];
+            const numPairs = numCards / 2;
+            const maxNumber = maxNumbersPerLevel[level - 1];
+            
+            // יצירת זוגות שסכומם שווה למספר היעד
+            for (let i = 0; i < numPairs; i++) {
+                // מספר אקראי עבור הכרטיס הראשון בזוג
+                let firstNumber;
+                let secondNumber;
+                
+                // וידוא שהמספרים חיוביים ובטווח המתאים
+                do {
+                    firstNumber = Math.floor(Math.random() * maxNumber) + 1;
+                    secondNumber = targetSum - firstNumber;
+                } while (secondNumber <= 0 || secondNumber > maxNumber);
+                
+                cards.push({ id: i * 2, number: firstNumber, matched: false });
+                cards.push({ id: i * 2 + 1, number: secondNumber, matched: false });
+            }
+        }
+        
+        // פונקציה לערבוב הכרטיסים
+        function shuffleCards() {
+            for (let i = cards.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [cards[i], cards[j]] = [cards[j], cards[i]];
+            }
+        }
+        
+        // פונקציה להצגת הכרטיסים
+        function renderCards() {
+            gameBoard.innerHTML = "";
+            cards.forEach(card => {
+                const cardElement = document.createElement("div");
+                cardElement.className = "card";
+                cardElement.dataset.id = card.id;
+                
+                // יצירת מבנה פנימי של הקלף
+                const cardInner = document.createElement("div");
+                cardInner.className = "card-inner";
+                
+                // יצירת החלק הקדמי של הקלף (עם המספר)
+                const cardFront = document.createElement("div");
+                cardFront.className = "card-front";
+                cardFront.textContent = card.number;
+                
+                // יצירת החלק האחורי של הקלף
+                const cardBack = document.createElement("div");
+                cardBack.className = "card-back";
+                cardBack.textContent = "?";
+                
+                // הוספת החלקים לקלף
+                cardInner.appendChild(cardFront);
+                cardInner.appendChild(cardBack);
+                cardElement.appendChild(cardInner);
+                
+                if (card.matched) {
+                    cardElement.classList.add("matched");
+                }
+                
+                cardElement.addEventListener("click", () => selectCard(cardElement, card));
+                gameBoard.appendChild(cardElement);
+            });
+        }
+        
+        // פונקציה לבחירת כרטיס
+        function selectCard(cardElement, card) {
+            // אם הכרטיס כבר נבחר, התאים או שכבר נבחרו 2 קלפים, אין צורך לעשות כלום
+            if (card.matched || selectedCards.length >= 2 || cardElement.classList.contains("flipped")) {
+                return;
+            }
+            
+            // הפיכת הקלף
+            cardElement.classList.add("flipped");
+            selectedCards.push({ element: cardElement, card });
+            
+            // בדיקה אם נבחרו שני כרטיסים
+            if (selectedCards.length === 2) {
+                setTimeout(checkForMatch, 1000);
+            }
+        }
+        
+        // פונקציה לבדיקת התאמה בין שני כרטיסים
+        function checkForMatch() {
+            const card1 = selectedCards[0].card;
+            const card2 = selectedCards[1].card;
+            const element1 = selectedCards[0].element;
+            const element2 = selectedCards[1].element;
+            
+            // חישוב הסכום
+            const sum = card1.number + card2.number;
+            
+            // בדיקה אם הסכום שווה למספר היעד
+            if (sum === targetSum) {
+                // התאמה נכונה
+                card1.matched = true;
+                card2.matched = true;
+                element1.classList.add("matched");
+                element2.classList.add("matched");
+                score++;
+                scoreElement.textContent = `נקודות: ${score}`;
+                pairsFound++;
+                
+                // בדיקה אם נמצאו כל הזוגות בשלב
+                if (pairsFound === cardsPerLevel[currentLevel - 1] / 2) {
+                    // סיום השלב
+                    if (currentLevel < 3) {
+                        nextLevelButton.style.display = "block";
+                    } else {
+                        // סיום המשחק
+                        endGame();
+                    }
+                }
+            } else {
+                // התאמה שגויה - הצגת הודעת שגיאה
+                element1.classList.add("error");
+                element2.classList.add("error");
+                
+                // הצגת הודעת שגיאה
+                const errorMessage = document.getElementById("errorMessage");
+                errorMessage.textContent = `${card1.number} + ${card2.number} = ${sum}, לא שווה ל-${targetSum}!`;
+                errorMessage.style.display = "block";
+                
+                // הסתרת הודעת השגיאה אחרי 1.5 שניות
+                setTimeout(() => {
+                    errorMessage.style.display = "none";
+                    
+                    // הסרת קלאס השגיאה והחזרת הקלפים למצב הפוך
+                    element1.classList.remove("error");
+                    element2.classList.remove("error");
+                    element1.classList.remove("flipped");
+                    element2.classList.remove("flipped");
+                }, 1500);
+            }
+            
+            // איפוס הכרטיסים הנבחרים
+            selectedCards = [];
+        }
+        
+        // פונקציה למעבר לשלב הבא
+        function goToNextLevel() {
+            currentLevel++;
+            startLevel(currentLevel);
+        }
+        
+        // פונקציה לסיום המשחק
+        function endGame() {
+            clearInterval(timerInterval);
+            gameScreen.style.display = "none";
+            resultScreen.style.display = "block";
+            playerNameResult.textContent = `${playerName},`;
+            finalScoreElement.textContent = `צברת ${score} נקודות בזמן ${formatTime(timer)}`;
+        }
+        
+        // פונקציה לאיפוס המשחק
+        function resetGame() {
+            // איפוס משתנים
+            currentLevel = 1;
+            score = 0;
+            timer = 0;
+            pairsFound = 0;
+            
+            // עדכון אלמנטים
+            scoreElement.textContent = `נקודות: ${score}`;
+            timerElement.textContent = `זמן: ${formatTime(timer)}`;
+            
+            // הצגת מסך הפתיחה
+            resultScreen.style.display = "none";
+            welcomeScreen.style.display = "block";
+        }
+        
+        // פונקציה להתחלת טיימר
+        function startTimer() {
+            timer = 0;
+            clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                timer++;
+                timerElement.textContent = `זמן: ${formatTime(timer)}`;
+            }, 1000);
+        }
+        
+        // פונקציה לפורמט זמן
+        function formatTime(seconds) {
+            const minutes = Math.floor(seconds / 60);
+            const remainingSeconds = seconds % 60;
+            return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+        }
+    </script>
+</body>
+</html>
